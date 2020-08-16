@@ -47,4 +47,6 @@ include("simplify_rules.jl")
 export simplify, substitute
 include("api.jl")
 
+include("arrays.jl")
+
 end # module
