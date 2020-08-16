@@ -201,8 +201,10 @@ variable. So, `h(1, g)` will fail and `h(1, f)` will work.
 """
 macro syms(xs...)
     defs = map(xs) do x
-        n, t = _name_type(x)
-        :($(esc(n)) = Sym{$(esc(t))}($(Expr(:quote, n))))
+        nt = _name_type(x)
+        n, t = nt.name, nt.type
+        m = get(nt, :metadata, Dict{Type,Any}())
+        :($(esc(n)) = Sym{$(esc(t))}($(Expr(:quote, n)), $m))
     end
 
     Expr(:block, defs...,
@@ -212,6 +214,8 @@ end
 function syms_syntax_error()
     error("Incorrect @syms syntax. Try `@syms x::Real y::Complex g(a) f(::Real)::Real` for instance.")
 end
+
+arraymeta(foo) = Dict{Type, Any}(ArrayCtx => foo)
 
 function _name_type(x)
     if x isa Symbol
@@ -228,6 +232,12 @@ function _name_type(x)
         else
             return (name=lhs, type=rhs)
         end
+    elseif x isa Expr && x.head === :ref
+        ntype = _name_type(x.args[1]) # a::Number
+        N = length(x.args)-1
+        return (name=ntype.name,
+                type=:(Array{$(ntype.type), $N}),
+                metadata=:(arraymeta(ArrayShape(Base.Slice.(($(x.args[2:end]...),))))))
     elseif x isa Expr && x.head === :call
         return _name_type(:($x::Number))
     else
@@ -333,8 +343,16 @@ function Base.show(io::IO, t::Term)
         fname = nameof(f)
         binary = Base.isbinaryoperator(fname)
         color = get(io, :withcolor, :white)
+        openparen = "("
+        closeparen = "("
+        sep = " $fname "
+        if f === (^)
+            sep = "$fname"
+            closeparen = openparen = ""
+        end
+
         if binary
-            get(io, :paren, false) && Base.printstyled(io, "(",color=color)
+            get(io, :paren, false) && Base.printstyled(io, openparen,color=color)
             for i = 1:length(args)
                 length(args) == 1 && Base.printstyled(io, fname, color=color)
 
@@ -343,17 +361,34 @@ function Base.show(io::IO, t::Term)
                                  args[i], color=color)
                 args[i] isa Complex && Base.printstyled(io, ")",color=color)
 
-                i != length(args) && Base.printstyled(io, " $fname ", color=color)
+                i != length(args) && Base.printstyled(io, sep, color=color)
             end
-            get(io, :paren, false) && Base.printstyled(io, ")", color=color)
+            get(io, :paren, false) && Base.printstyled(io, closeparen, color=color)
         else
-            Base.printstyled(io, "$fname(", color=color)
-            for i=1:length(args)
-                Base.printstyled(IOContext(io, :paren => false),
-                                 args[i], color=color)
-                i != length(args) && Base.printstyled(io, ", ", color=color)
+            if f === getindex
+                Base.printstyled(io, "$(args[1])[", color=color)
+                for i=2:length(args)
+                    if args[i] isa Base.Slice
+                        val = args[i].indices
+                    elseif args[i] isa Base.Colon
+                        val = :(:)
+                    else
+                        val = args[i]
+                    end
+                    Base.printstyled(IOContext(io, :paren => false),
+                                     val, color=color)
+                    i != length(args) && Base.printstyled(io, ", ", color=color)
+                end
+                Base.printstyled(io, "]", color=color)
+            else
+                Base.printstyled(io, "$fname(", color=color)
+                for i=1:length(args)
+                    Base.printstyled(IOContext(io, :paren => false),
+                                     args[i], color=color)
+                    i != length(args) && Base.printstyled(io, ", ", color=color)
+                end
+                Base.printstyled(io, ")", color=color)
             end
-            Base.printstyled(io, ")", color=color)
         end
     end
     return nothing

@@ -2,6 +2,8 @@ module SymbolicUtils
 
 export @syms, term, showraw
 
+struct ArrayCtx end
+
 # Sym, Term and other types
 include("types.jl")
 
