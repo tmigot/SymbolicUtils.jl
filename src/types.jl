@@ -254,8 +254,16 @@ macro syms(xs...)
     defs = map(xs) do x
         n, t = _name_type(x)
         :($(esc(n)) = Sym{$(esc(t))}($(Expr(:quote, n))))
+        nt = _name_type(x)
+        n, t = nt.name, nt.type
+        m = get(nt, :array_metadata, nothing)
+        if m !== nothing
+            :($(esc(n)) = setmetadata(Sym{$(esc(t))}($(Expr(:quote, n))),
+                                      $ArrayShapeCtx, $m))
+        else
+            :($(esc(n)) = Sym{$(esc(t))}($(Expr(:quote, n)), $m))
+        end
     end
-
     Expr(:block, defs...,
          :(tuple($(map(x->esc(_name_type(x).name), xs)...))))
 end
@@ -279,6 +287,12 @@ function _name_type(x)
         else
             return (name=lhs, type=rhs)
         end
+    elseif x isa Expr && x.head === :ref
+        ntype = _name_type(x.args[1]) # a::Number
+        N = length(x.args)-1
+        return (name=ntype.name,
+                type=:(Array{$(ntype.type), $N}),
+                array_metadata=:(ArrayShape(Base.Slice.(($(x.args[2:end]...),)))))
     elseif x isa Expr && x.head === :call
         return _name_type(:($x::Number))
     else

@@ -11,6 +11,8 @@ import Base: +, -, *, /, \, ^, ImmutableDict
 using ConstructionBase
 include("types.jl")
 
+include("arrays.jl")
+
 # Methods on symbolic objects
 using SpecialFunctions, NaNMath
 import IfElse: ifelse  # need to not bring IfElse name in or it will clash
