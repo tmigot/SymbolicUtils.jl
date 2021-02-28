@@ -23,9 +23,9 @@ function labels!(dicts, t)
         return t
     elseif istree(t) && (operation(t) == (*) || operation(t) == (+) || operation(t) == (-))
         tt = arguments(t)
-        return similarterm(t, operation(t), map(x->labels!(dicts, x), arguments(t)))
+        return similarterm(t, operation(t), map(x->labels!(dicts, x), tt), symtype(t))
     elseif istree(t) && operation(t) == (^) && length(arguments(t)) > 1 && isnonnegint(arguments(t)[2])
-        return similarterm(t, operation(t), map(x->labels!(dicts, x), arguments(t)))
+        return similarterm(t, operation(t), map(x->labels!(dicts, x), arguments(t)), symtype(t))
     else
         sym2term, term2sym = dicts
         if haskey(term2sym, t)
@@ -36,7 +36,8 @@ function labels!(dicts, t)
             sym = Sym{symtype(t)}(gensym(nameof(operation(t))))
             dicts2 = _dicts(dicts[2])
             sym2term[sym] = similarterm(t, operation(t),
-                                        map(x->to_mpoly(x, dicts)[1], arguments(t)))
+                                        map(x->to_mpoly(x, dicts)[1], arguments(t)),
+                                        symtype(t))
         else
             sym = Sym{symtype(t)}(gensym("literal"))
             sym2term[sym] = t
@@ -65,10 +66,8 @@ let
                    @acrule(~x::ismpoly * ~y::ismpoly => ~x * ~y)
                    @rule(*(~x) => ~x)
                    @rule((~x::ismpoly)^(~a::isnonnegint) => (~x)^(~a))]
-    MPOLY_CLEANUP = Fixpoint(Postwalk(PassThrough(RestartedChain(mpoly_preprocess))))
+    global const MPOLY_CLEANUP = Fixpoint(Postwalk(PassThrough(RestartedChain(mpoly_preprocess))))
     MPOLY_MAKER = Fixpoint(Postwalk(PassThrough(RestartedChain(mpoly_rules))))
-
-    global MPOLY_CLEANUP
 
     global to_mpoly
     function to_mpoly(t, dicts=_dicts())
@@ -112,7 +111,7 @@ function _to_term(reference, x::MPoly, dict, syms)
         elseif length(monics) == 0
             return 1
         else
-            return similarterm(reference, *, monics)
+            return similarterm(reference, *, monics, symtype(reference))
         end
     end
 
@@ -120,12 +119,13 @@ function _to_term(reference, x::MPoly, dict, syms)
     if length(monoms) == 0
         return 0
     elseif length(monoms) == 1
-        t = !isone(x.coeffs[1]) ?  monoms[1] * x.coeffs[1] : monoms[1]
+        t = !isone(x.coeffs[1]) ?  monoms[1] * Int(x.coeffs[1]) : monoms[1]
     else
         t = similarterm(reference,
                         +,
-                        map((x,y)->isone(y) ? x : y*x,
-                            monoms, x.coeffs[1:length(monoms)]))
+                        map((x,y)->isone(y) ? x : Int(y)*x,
+                            monoms, x.coeffs[1:length(monoms)]),
+                        symtype(reference))
     end
 
     substitute(t, dict, fold=false)
@@ -133,7 +133,7 @@ end
 
 function _to_term(reference, x, dict, vars)
     if istree(x)
-        t=similarterm(x, operation(x), _to_term.((reference,), arguments(x), (dict,), (vars,)))
+        t=similarterm(x, operation(x), _to_term.((reference,), arguments(x), (dict,), (vars,)), symtype(x))
     else
         if haskey(dict, x)
             return dict[x]

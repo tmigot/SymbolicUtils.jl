@@ -1,15 +1,19 @@
 module SymbolicUtils
 
-export @syms, term, showraw
+export @syms, term, showraw, hasmetadata, getmetadata, setmetadata
 
-struct ArrayCtx end
-
-# Sym, Term and other types
+# Sym, Term,
+# Add, Mul and Pow
+using DataStructures
+using Setfield
+import Setfield: PropertyLens
+import Base: +, -, *, /, \, ^, ImmutableDict
+using ConstructionBase
 include("types.jl")
 
 # Methods on symbolic objects
 using SpecialFunctions, NaNMath
-export cond
+import IfElse: ifelse  # need to not bring IfElse name in or it will clash
 include("methods.jl")
 
 # LinkedList, simplification utilities
@@ -34,7 +38,6 @@ include("matchers.jl")
 # Convert to an efficient multi-variate polynomial representation
 import AbstractAlgebra.Generic: MPoly, PolynomialRing, ZZ, exponent_vector
 using AbstractAlgebra: ismonomial, symbols
-using DataStructures
 include("abstractalgebra.jl")
 
 # Term ordering
@@ -47,6 +50,6 @@ include("simplify_rules.jl")
 export simplify, substitute
 include("api.jl")
 
-include("arrays.jl")
+include("code.jl")
 
 end # module

@@ -1,5 +1,5 @@
 using BenchmarkTools, SymbolicUtils
-using SymbolicUtils: isnumber
+using SymbolicUtils: is_literal_number
 
 using Random
 
@@ -8,7 +8,7 @@ SUITE = BenchmarkGroup()
 @syms a b c d; Random.seed!(123);
 
 let r = @rule(~x => ~x), rs = RuleSet([r]),
-    acr = @rule(~x::isnumber + ~y => ~y)
+    acr = @rule(~x::is_literal_number + ~y => ~y)
 
     overhead = SUITE["overhead"]  = BenchmarkGroup()
     overhead["rule"]  = BenchmarkGroup()
@@ -51,4 +51,19 @@ let r = @rule(~x => ~x), rs = RuleSet([r]),
     overhead["simplify"]["randterm (/, *):serial"] = @benchmarkable simplify($ex2, threaded=false)
     overhead["simplify"]["randterm (+, *):thread"] = @benchmarkable simplify($ex1, threaded=true)
     overhead["simplify"]["randterm (/, *):thread"] = @benchmarkable simplify($ex2, threaded=true)
+
+    overhead["substitute"] = BenchmarkGroup()
+
+
+    overhead["substitute"]["a"] = @benchmarkable substitute(subs_expr, $(Dict(a=>1))) setup=begin
+        subs_expr = (sin(a+b) + cos(b+c)) * (sin(b+c) + cos(c+a)) * (sin(c+a) + cos(a+b))
+    end
+
+    overhead["substitute"]["a,b"] = @benchmarkable substitute(subs_expr, $(Dict(a=>1, b=>2))) setup=begin
+        subs_expr = (sin(a+b) + cos(b+c)) * (sin(b+c) + cos(c+a)) * (sin(c+a) + cos(a+b))
+    end
+
+    overhead["substitute"]["a,b,c"] = @benchmarkable substitute(subs_expr, $(Dict(a=>1, b=>2, c=>3))) setup=begin
+        subs_expr = (sin(a+b) + cos(b+c)) * (sin(b+c) + cos(c+a)) * (sin(c+a) + cos(a+b))
+    end
 end

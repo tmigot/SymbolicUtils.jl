@@ -1,18 +1,20 @@
 <h1 align="center"><a href="https://juliasymbolics.github.io/SymbolicUtils.jl/">SymbolicUtils.jl</a></h1>
 
 <p align="center">
-  <a href="https://travis-ci.com/github/JuliaSymbolics/SymbolicUtils.jl">
-    <img src="https://travis-ci.org/JuliaSymbolics/SymbolicUtils.jl.svg?branch=master"
-         alt="Build Status (Linux)">
+  <a href="https://github.com/JuliaSymbolics/SymbolicUtils.jl/actions">
+    <img src="https://github.com/JuliaSymbolics/SymbolicUtils.jl/workflows/CI/badge.svg"
+         alt="CI">
   </a>
   </a>
-  <a href="https://coveralls.io/github/JuliaSymbolics/SymbolicUtils.jl?branch=master">
-    <img src="https://coveralls.io/repos/github/JuliaSymbolics/SymbolicUtils.jl/badge.svg?branch=master"
-         alt="Coverage">
+  <a href="https://codecov.io/gh/JuliaSymbolics/SymbolicUtils.jl">
+    <img src="https://codecov.io/gh/JuliaSymbolics/SymbolicUtils.jl/branch/master/graph/badge.svg?token=UL72EBCQRW"/>
   </a>
 </p>
 
-SymbolicUtils.jl provides various utilities for symbolic computing.
+SymbolicUtils.jl provides various utilities for symbolic computing. SymbolicUtils.jl is what one would use to build
+a Computer Algebra System (CAS). If you're looking for a complete CAS, similar to SymPy or Mathematica, see
+[Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl). If you want to build a crazy CAS for your weird
+Octonian algebras, you've come to the right place.
 
 [Symbols in SymbolicUtils](https://juliasymbolics.github.io/SymbolicUtils.jl/#creating_symbolic_expressions) carry type information. Operations on them propagate this information. [A rule-based rewriting language](https://juliasymbolics.github.io/SymbolicUtils.jl/#rule-based_rewriting) can be used to find subexpressions that satisfy arbitrary conditions and apply arbitrary transformations on the matches. The library also contains a set of useful [simplification](https://juliasymbolics.github.io/SymbolicUtils.jl/#simplification) rules for expressions of numeric symbols and numbers. These can be remixed and extended for special purposes.
 
@@ -33,6 +35,8 @@ julia> using Pkg; Pkg.add("SymbolicUtils")
 ### "I don't want to read your manual, just show me some cool code"
 ```julia
 julia> using SymbolicUtils
+
+julia> SymbolicUtils.show_simplified[] = true
 
 julia> @syms x::Real y::Real z::Complex f(::Number)::Real
 (x, y, z, f(::Number)::Real)

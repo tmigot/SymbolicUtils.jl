@@ -5,12 +5,12 @@ using SymbolicUtils: getdepth, Rewriters
     @syms w z α::Real β::Real
 
     r1 = @rule ~x + ~x => 2 * (~x)
-    r2 = @rule ~x * +(~~ys) => sum(map(y-> ~x * y, ~~ys));
+    r2 = @acrule ~x * +(~~ys) => sum(map(y-> ~x * y,  ~~ys));
 
-    rset = Rewriters.Postwalk(Rewriters.Chain([r1, r2]))
+    rset = Rewriters.Postwalk(Rewriters.Chain([r2]))
     @test getdepth(rset) == typemax(Int)
 
-    ex = 2 * (w+w+α+β)
+    ex = 2 * (w + w + α + β)
 
     @eqtest rset(ex) == (((2 * w) + (2 * w)) + (2 * α)) + (2 * β)
     @eqtest Rewriters.Fixpoint(rset)(ex) == ((2 * (2 * w)) + (2 * α)) + (2 * β)
@@ -30,14 +30,15 @@ end
     @eqtest simplify(1x + 2x) == 3x
     @eqtest simplify(3x + 2x) == 5x
 
-    @eqtest simplify(a + b + (x * y) + c + 2 * (x * y) + d)     == (3 * x * y) + a + b + c + d
-    @eqtest simplify(a + b + 2 * (x * y) + c + 2 * (x * y) + d) == (4 * x * y) + a + b + c + d
+    @eqtest simplify(a + b + (x * y) + c + 2 * (x * y) + d)     == simplify((3 * x * y) + a + b + c + d)
+    @eqtest simplify(a + b + 2 * (x * y) + c + 2 * (x * y) + d) == simplify((4 * x * y) + a + b + c + d)
 
-    @eqtest simplify(a * x^y * b * x^d) == (a * b * (x ^ (d + y)))
+    @eqtest simplify(a * x^y * b * x^d) == simplify(a * b * (x ^ (d + y)))
 
-    @eqtest simplify(a + b + 0*c + d) == a + b + d
-    @eqtest simplify(a * b * c^0 * d) == a * b * d
-    @eqtest simplify(a * b * 1*c * d) == a * b * c * d
+    @eqtest simplify(a + b + 0*c + d) == simplify(a + b + d)
+    @eqtest simplify(a * b * c^0 * d) == simplify(a * b * d)
+    @eqtest simplify(a * b * 1*c * d) == simplify(a * b * c * d)
+    @eqtest simplify(x^2.0/(x*y)^2.0) == y ^ (-2.0)
 
     @test simplify(Term(one, [a])) == 1
     @test simplify(Term(one, [b+1])) == 1
@@ -62,14 +63,14 @@ end
     @eqtest simplify((0 < a) & false) == false
     @eqtest simplify(Term{Bool}(!, [true])) == false
     @eqtest simplify(Term{Bool}(|, [false, true])) == true
-    @eqtest simplify(cond(true, a,b)) == a
-    @eqtest simplify(cond(false, a,b)) == b
+    @eqtest simplify(ifelse(true, a,b)) == a
+    @eqtest simplify(ifelse(false, a,b)) == b
 
     # abs
-    @test simplify(substitute(cond(!(a < 0), a,-a), Dict(a=>-1))) == 1
-    @test simplify(substitute(cond(!(a < 0), a,-a), Dict(a=>1))) == 1
-    @test simplify(substitute(cond(a < 0, -a, a), Dict(a=>-1))) == 1
-    @test simplify(substitute(cond(a < 0, -a, a), Dict(a=>1))) == 1
+    @test simplify(substitute(ifelse(!(a < 0), a,-a), Dict(a=>-1))) == 1
+    @test simplify(substitute(ifelse(!(a < 0), a,-a), Dict(a=>1))) == 1
+    @test simplify(substitute(ifelse(a < 0, -a, a), Dict(a=>-1))) == 1
+    @test simplify(substitute(ifelse(a < 0, -a, a), Dict(a=>1))) == 1
 end
 
 @testset "Pythagorean Identities" begin
@@ -86,7 +87,7 @@ end
 @testset "Depth" begin
     @syms x
     R = Rewriters.Postwalk(Rewriters.Chain([@rule(sin(~x) => cos(~x)),
-                                            @rule( ~x + 1 => ~x - 1)]))
+                                            @rule(1 + ~x => ~x - 1)]))
     @eqtest R(sin(sin(sin(x + 1)))) == cos(cos(cos(x - 1)))
     #@eqtest R(sin(sin(sin(x + 1))), depth=2) == cos(cos(sin(x + 1)))
 end
@@ -109,7 +110,7 @@ end
           ((((1 * a) + (1 * a)) / ((2.0 * (d + 1)) / 1.0)) +
            ((((d * 1) / (1 + c)) * 2.0) / ((1 / d) + (1 / c))))
     @eqtest simplify(ex) == simplify(ex, threaded=true, thread_subtree_cutoff=3)
-    @test SymbolicUtils.node_count(a + b * c / d) == 7
+    @test SymbolicUtils.node_count(a + b * c / d) == 8
 end
 
 @testset "timerwrite" begin

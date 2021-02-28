@@ -109,12 +109,12 @@ sym_isa(::Type{T}) where {T} = @nospecialize(x) -> x isa T || symtype(x) <: T
 is_operation(f) = @nospecialize(x) -> istree(x) && (operation(x) == f)
 
 isliteral(::Type{T}) where {T} = x -> x isa T
-isnumber(x) = isliteral(Number)(x)
+is_literal_number(x) = isliteral(Number)(x)
 
-_iszero(t) = false
-_iszero(x::Number) = iszero(x)
-_isone(t) = false
-_isone(x::Number) = isone(x)
+# checking the type directly is faster than dynamic dispatch in type unstable code
+_iszero(x) = x isa Number && iszero(x)
+_isone(x) = x isa Number && isone(x)
+_isinteger(x) = (x isa Number && isinteger(x)) || (x isa Symbolic && symtype(x) <: Integer)
 
 issortedₑ(args) = issorted(args, lt=<ₑ)
 needs_sorting(f) = x -> is_operation(f)(x) && !issortedₑ(arguments(x))
@@ -192,4 +192,24 @@ function sort_args(f, t)
     end
     args = args isa Tuple ? [args...] : args
     similarterm(t, f, sort(args, lt=<ₑ))
+end
+
+# Take a struct definition and make it be able to match in `@rule`
+macro matchable(expr)
+    @assert expr.head == :struct
+    name = expr.args[2]
+    if name isa Expr && name.head === :curly
+        name = name.args[1]
+    end
+    fields = filter(x-> !(x isa LineNumberNode), expr.args[3].args)
+    get_name(s::Symbol) = s
+    get_name(e::Expr) = (@assert(e.head == :(::)); e.args[1])
+    fields = map(get_name, fields)
+    quote
+        $expr
+        SymbolicUtils.istree(::$name) = true
+        SymbolicUtils.operation(::$name) = $name
+        SymbolicUtils.arguments(x::$name) = getfield.((x,), ($(QuoteNode.(fields)...),))
+        Base.length(x::$name) = $(length(fields) + 1)
+    end |> esc
 end

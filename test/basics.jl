@@ -1,5 +1,6 @@
-using SymbolicUtils: Sym, FnType, Term, symtype
+using SymbolicUtils: Sym, FnType, Term, Add, Mul, Pow, symtype, operation, arguments
 using SymbolicUtils
+using IfElse: ifelse
 using Test
 
 @testset "@syms" begin
@@ -48,16 +49,49 @@ end
     @test hash(g(a, b)) == hash(f(a,b))
     @test hash(f(a, b)) == hash(f(c,b))
     @test hash(sin(a+1)) == hash(sin(c+1))
+
+    ex = sin(a+1)
+    h = hash(ex, UInt(0))
+    @test ex.hash[] == h
+    ex1 = sin(a+1)
+    hash(asin(ex1), UInt(0))
+    @test ex1.hash[] == h
+end
+
+struct Ctx1 end
+struct Ctx2 end
+
+@testset "metadata" begin
+    @syms a b c
+    for a = [a, sin(a), a+b, a*b, a^3]
+
+        a′ = setmetadata(a, Ctx1, "meta_1")
+
+        @test hasmetadata(a′, Ctx1)
+        @test !hasmetadata(a′, Ctx2)
+
+        a′ = setmetadata(a′, Ctx2, "meta_2")
+
+        @test hasmetadata(a′, Ctx1)
+        @test hasmetadata(a′, Ctx2)
+
+        @test getmetadata(a′, Ctx1) == "meta_1"
+        @test getmetadata(a′, Ctx2) == "meta_2"
+    end
 end
 
 @testset "Base methods" begin
     @syms w::Complex z::Complex a::Real b::Real x
 
-    @test isequal(w + z, Term{Complex}(+, [w, z]))
-    @test isequal(z + a, Term{Number}(+, [z, a]))
-    @test isequal(a + b, Term{Real}(+, [a, b]))
-    @test isequal(a + x, Term{Number}(+, [a, x]))
-    @test isequal(a + z, Term{Number}(+, [a, z]))
+    @test isequal(w + z, Add(Number, 0, Dict(w=>1, z=>1)))
+    @test isequal(z + a, Add(Number, 0, Dict(z=>1, a=>1)))
+    @test isequal(a + b, Add(Real, 0, Dict(a=>1, b=>1)))
+    @test isequal(a + x, Add(Number, 0, Dict(a=>1, x=>1)))
+    @test isequal(a + z, Add(Number, 0, Dict(a=>1, z=>1)))
+
+    foo(w, z, a, b) = 1.0
+    SymbolicUtils.promote_symtype(::typeof(foo), args...) = Real
+    @test SymbolicUtils._promote_symtype(foo, (w, z, a, b,)) === Real
 
     # promote_symtype of identity
     @test isequal(Term(identity, [w]), Term{Complex}(identity, [w]))
@@ -73,8 +107,9 @@ end
         @test isequal(f(a, a), Term{Bool}(f, [a, a]))
     end
 
-    @test symtype(cond(true, 4, 5)) == Int
-    @test symtype(cond(a < 0, b, w)) == Union{Real, Complex}
+    @test symtype(ifelse(true, 4, 5)) == Int
+    @test symtype(ifelse(a < 0, b, w)) == Union{Real, Complex}
+    @test SymbolicUtils.promote_symtype(ifelse, Bool, Int, Bool) == Union{Int, Bool}
     @test_throws MethodError w < 0
     @test isequal(w == 0, Term{Bool}(==, [w, 0]))
 end
@@ -87,14 +122,43 @@ end
 @testset "substitute" begin
     @syms a b
     @test substitute(a, Dict(a=>1)) == 1
-    @test isequal(substitute(sin(a+b), Dict(a=>1)), sin(1+b))
+    @test isequal(substitute(sin(a+b), Dict(a=>1)), sin(b+1))
     @test substitute(a+b, Dict(a=>1, b=>3)) == 4
     @test substitute(exp(a), Dict(a=>2)) ≈ exp(2)
 end
 
 @testset "printing" begin
-    @syms a b
+    @syms a b c
     @test repr(a+b) == "a + b"
     @test repr(-a) == "-a"
-    @test repr(-a + 3) == "(-a) + 3"
+    @test repr(-a + 3) == "3 - a"
+    @test repr(-(a + b)) == "-a - b"
+    @test repr((2a)^(-2a)) == "(2a)^(-2a)"
+    @test repr(1/2a) == "(1//2)*(a^-1)"
+    @test repr(2/(2*a)) == "a^-1"
+    @test repr(Term(*, [1, 1])) == "*1"
+    @test repr(Term(*, [2, 1])) == "2*1"
+    @test repr((a + b) - (b + c)) == "a - c"
+    @test repr(a + -1*(b + c)) == "a - (b + c)"
+    @test repr(a + -1*b) == "a - b"
+end
+
+@testset "similarterm with Add" begin
+    @syms a b c
+    @test isequal(SymbolicUtils.similarterm((b + c), +, [a,  (b+c)]).dict, Dict(a=>1,b=>1,c=>1))
+end
+
+toterm(t) = Term{symtype(t)}(operation(t), arguments(t))
+
+@testset "diffs" begin
+    @syms a b c
+    @test isequal(toterm(-1c), Term{Number}(*, [-1, c]))
+    @test isequal(toterm(-1(a+b)), Term{Number}(*, [-1, a+b]))
+    @test isequal(toterm((a + b) - (b + c)), Term{Number}(+, [a, -1c]))
+end
+
+@testset "hash" begin
+    @syms a b
+    @test hash(a + b, UInt(0)) === hash(a + b) === hash(a + b, UInt(0)) # test caching
+    @test hash(a + b, UInt(2)) !== hash(a + b)
 end

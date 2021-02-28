@@ -57,7 +57,7 @@ const bool_spec = let
 
     fns = vcat(1 .=> [(!), (~)],
                2 .=> [(|), (&), xor],
-               3 .=> [cond]) # cond will still stay in bool by condtruction
+               3 .=> [ifelse]) # cond will still stay in bool by condtruction
 
     (leaves=bool_leaf_funcs,
      funcs=fns,
@@ -92,7 +92,8 @@ function gen_rand_expr(inputs;
     try
         return f(args...)
     catch err
-        if err isa DomainError || err isa DivideError || err isa MethodError
+        if err isa DomainError || err isa DivideError || err isa MethodError ||
+            err isa SymbolicUtils.SpecialFunctions.AmosException
             return gen_rand_expr(inputs,
                                  spec=spec,
                                  leaf_prob=leaf_prob,
@@ -140,28 +141,99 @@ function fuzz_test(ntrials, spec, simplify=simplify;kwargs...)
         catch err
             Errored(err)
         end
-        try
-            if unsimplified isa Errored
-                @test simplified isa Errored
-            elseif isnan(unsimplified)
-                @test isnan(simplified)
-                if !isnan(simplified)
-                    error("Failed")
-                end
-            else
-                @test unsimplified ≈ simplified
-                if !(unsimplified ≈ simplified)
-                    error("Failed")
-                end
+        if unsimplified isa Errored
+            if !(simplified isa Errored)
+                @test_skip false
+                @goto print_err
             end
-        catch err
-            println("""Test failed for expression
+            @test true
+        elseif simplified isa Errored
+            if !(unsimplified isa Errored)
+                @test_skip false
+                @goto print_err
+            end
+            @test true
+        elseif isnan(unsimplified)
+            if !isnan(simplified)
+                @test_skip false
+                @goto print_err
+            end
+            @test true
+        elseif isnan(simplified)
+            if !isnan(unsimplified)
+                @test_skip false
+                @goto print_err
+            end
+            @test true
+        else
+            if !(unsimplified ≈ simplified)
+                @test_skip false
+                @goto print_err
+            end
+            @test true
+        end
+        continue
+
+        @label print_err
+        println("""Test failed for expression
                     $(sprint(io->showraw(io, expr))) = $unsimplified
-                    Simplified to:
+                Simplified:
                     $(sprint(io->showraw(io, simplify(expr)))) = $simplified
-                    On inputs:
+                Inputs:
                     $inputs = $args
-                    """)
+                """)
+    end
+end
+
+leaves = [(@syms a b c d e g)..., a^3, a^-2, b^2, b^(-1), big.((3//5, 0//2, -1//2, 1//2, 1//2+2im))...]
+function gen_expr(lvl=5)
+    if lvl == 0
+        x = rand(leaves)
+        x, x
+    elseif rand() < 0.5
+        f = rand((+, *))
+        n = rand(1:5)
+        args = [gen_expr(lvl-1) for i in 1:n]
+
+        Term{Number}(f, first.(args)), f(last.(args)...)
+    else
+        f = rand((-,/))
+        l = gen_expr(lvl-1)
+        r = gen_expr(lvl-1)
+        if f === (/) && r[2] isa Number && iszero(r[2])
+            return gen_expr(lvl)
+        end
+        args = [l, r]
+
+        Term{Number}(f, first.(args)), f(last.(args)...)
+    end
+end
+
+test_dict = Dict{Any, Rational{BigInt}}(a=>1,b=>-1,c=>2,d=>-2,e=>5//3,g=>-2//3)
+function fuzz_addmulpow(lvl, d=test_dict)
+    l, r = gen_expr()
+    rl = try
+        substitute(l, d)
+    catch err
+        err
+    end
+    rr = try
+        substitute(r, d)
+    catch err
+        err
+    end
+
+    if !(rl isa Number) && rr isa Number
+        return # lhs errored, rhs did not
+    end
+    if rl isa Number || rr isa Number
+        if isequal(rl, rr)
+            @test true
+        else
+            println("Weird bug here:")
+            @show r l
+            @show rl rr
+            @test false
         end
     end
 end

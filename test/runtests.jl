@@ -1,5 +1,6 @@
 using Test
 using SymbolicUtils
+import IfElse: ifelse
 
 # == / != syntax is nice, let's use it in tests
 macro eqtest(expr)
@@ -12,16 +13,18 @@ macro eqtest(expr)
 end
 SymbolicUtils.show_simplified[] = false
 
-#using SymbolicUtils: Rule
-@test_broken isempty(detect_unbound_args(SymbolicUtils))
-
 include("basics.jl")
 include("order.jl")
 include("rewrite.jl")
 include("rulesets.jl")
+include("code.jl")
 include("nf.jl")
 include("interface.jl")
 include("fuzz.jl")
-if haskey(ENV, "TRAVIS")
+
+if haskey(ENV, "CI")
     include("benchmark.jl")
+    using Pkg
+    Pkg.add(url="https://github.com/SciML/ModelingToolkit.jl.git", rev="master")
+    Pkg.test("ModelingToolkit")
 end
