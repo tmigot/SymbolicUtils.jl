@@ -261,7 +261,7 @@ macro syms(xs...)
             :($(esc(n)) = setmetadata(Sym{$(esc(t))}($(Expr(:quote, n))),
                                       $ArrayShapeCtx, $m))
         else
-            :($(esc(n)) = Sym{$(esc(t))}($(Expr(:quote, n)), $m))
+            :($(esc(n)) = Sym{$(esc(t))}($(Expr(:quote, n))))
         end
     end
     Expr(:block, defs...,
