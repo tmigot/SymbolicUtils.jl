@@ -173,9 +173,9 @@ end
 
 Base.nameof(s::Sym) = s.name
 
-ConstructionBase.constructorof(s::Type{<:Sym{T}}) where {T} = Sym{T}
+ConstructionBase.constructorof(s::Type{<:Sym{T}}) where {T} = (n,m) -> Sym{T}(n, metadata=m)
 
-function (::Type{Sym{T}})(name, metadata=NO_METADATA) where {T}
+function (::Type{Sym{T}})(name; metadata=NO_METADATA) where {T}
     Sym{T, typeof(metadata)}(name, metadata)
 end
 
@@ -341,14 +341,14 @@ function ConstructionBase.constructorof(s::Type{<:Term{T}}) where {T}
     end
 end
 
-function (::Type{Term{T}})(f, args, metadata=NO_METADATA) where {T}
+function (::Type{Term{T}})(f, args; metadata=NO_METADATA) where {T}
     Term{T, typeof(metadata)}(f, args, metadata, Ref{UInt}(0))
 end
 
 istree(t::Term) = true
 
-function Term(f, args, metadata=NO_METADATA)
-    Term{_promote_symtype(f, args)}(f, args, metadata)
+function Term(f, args; metadata=NO_METADATA)
+    Term{_promote_symtype(f, args)}(f, args, metadata=metadata)
 end
 
 operation(x::Term) = getfield(x, :f)
@@ -439,6 +439,7 @@ cdrargs(args) = setargs(t, cdr(args))
 print_arg(io, x::Union{Complex, Rational}) = print(io, "(", x, ")")
 print_arg(io, x) = print(io, x)
 print_arg(io, f::typeof(^), x) = print_arg(IOContext(io, :paren=>true), x)
+print_arg(io, s::String) = show(io, s)
 function print_arg(io, f, x)
     f !== (*) && return print_arg(io, x)
     if istree(x) && Base.isbinaryoperator(nameof(operation(x)))
