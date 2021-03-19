@@ -12,6 +12,7 @@ using ConstructionBase
 include("types.jl")
 
 include("arrays.jl")
+include("tensor-dsl.jl")
 
 # Methods on symbolic objects
 using SpecialFunctions, NaNMath
