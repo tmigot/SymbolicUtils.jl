@@ -13,6 +13,7 @@ include("types.jl")
 
 include("arrays.jl")
 include("tensor-dsl.jl")
+include("array-lib.jl")
 
 # Methods on symbolic objects
 using SpecialFunctions, NaNMath
