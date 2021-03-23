@@ -50,7 +50,11 @@ function substitute(expr, dict; fold=true)
                 canfold = canfold && !(x′ isa Symbolic)
                 x′
             end
+            @show "SymbolicUtils - api: in"
+            @show canfold, expr
+            @show args
             canfold && return operation(expr)(args...)
+            @show "out"
             args
         else
             args = map(x->substitute(x, dict), arguments(expr))

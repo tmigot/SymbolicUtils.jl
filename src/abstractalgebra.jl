@@ -86,7 +86,10 @@ let
         R, vars = PolynomialRing(ZZ, String.(nameof.(ks)))
 
         replace_with_poly = Dict{Sym,MPoly}(zip(ks, vars))
+        @show "There"
+        @show labeled, replace_with_poly
         t_poly = substitute(labeled, replace_with_poly, fold=false)
+        @show "Yeah!"
         MPOLY_MAKER(t_poly), sym2term
     end
 end
